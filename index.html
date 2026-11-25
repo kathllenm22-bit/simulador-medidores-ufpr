@@ -1,0 +1,1557 @@
+<!DOCTYPE html>
+<html lang="pt-BR" class="dark">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Simulador de Carga e Sobrecarga — Centro Politécnico (UFPR)</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=JetBrains+Mono:wght@500;700&display=swap" rel="stylesheet" />
+
+  <script>
+    tailwind.config = {
+      darkMode: 'class',
+      theme: {
+        extend: {
+          fontFamily: {
+            sans: ['Inter', 'system-ui', 'sans-serif'],
+            mono: ['JetBrains Mono', 'monospace'],
+          },
+          colors: {
+            cluster: {
+              bg: '#090d16',
+              panel: '#101726',
+              card: '#151f33',
+              border: '#23314d',
+              normal: '#10b981',
+              routine: '#f59e0b',
+              overload: '#ef4444',
+              pane: '#c084fc',
+              off: '#94a3b8',
+            }
+          }
+        }
+      }
+    };
+  </script>
+
+  <style>
+    @keyframes warnPulseRed {
+      0%, 100% {
+        opacity: 1;
+        box-shadow: 0 0 0 0 rgba(239, 68, 68, 0.75), inset 0 0 18px rgba(239, 68, 68, 0.35);
+        transform: scale(1);
+      }
+      50% {
+        opacity: 0.35;
+        box-shadow: 0 0 24px 6px rgba(239, 68, 68, 0.85), inset 0 0 24px rgba(239, 68, 68, 0.55);
+        transform: scale(1.015);
+      }
+    }
+
+    @keyframes warnPulsePurple {
+      0%, 100% {
+        opacity: 1;
+        box-shadow: 0 0 0 0 rgba(192, 132, 252, 0.75), inset 0 0 18px rgba(168, 85, 247, 0.35);
+        transform: scale(1);
+      }
+      50% {
+        opacity: 0.4;
+        box-shadow: 0 0 24px 6px rgba(192, 132, 252, 0.85), inset 0 0 24px rgba(168, 85, 247, 0.55);
+        transform: scale(1.015);
+      }
+    }
+
+    @keyframes warnPulseAmber {
+      0%, 100% {
+        opacity: 1;
+        box-shadow: 0 0 14px rgba(245, 158, 11, 0.45), inset 0 0 12px rgba(245, 158, 11, 0.25);
+      }
+      50% {
+        opacity: 0.65;
+        box-shadow: 0 0 6px rgba(245, 158, 11, 0.2), inset 0 0 6px rgba(245, 158, 11, 0.12);
+      }
+    }
+
+    @keyframes bezelFlash {
+      0%, 100% {
+        border-color: rgba(239, 68, 68, 0.95);
+        box-shadow: 0 0 28px rgba(239, 68, 68, 0.32);
+      }
+      50% {
+        border-color: rgba(239, 68, 68, 0.25);
+        box-shadow: 0 0 6px rgba(239, 68, 68, 0.08);
+      }
+    }
+
+    @keyframes bezelFlashPurple {
+      0%, 100% {
+        border-color: rgba(192, 132, 252, 0.95);
+        box-shadow: 0 0 28px rgba(168, 85, 247, 0.32);
+      }
+      50% {
+        border-color: rgba(192, 132, 252, 0.25);
+        box-shadow: 0 0 6px rgba(168, 85, 247, 0.08);
+      }
+    }
+
+    .lamp-overload-flash {
+      animation: warnPulseRed 0.65s infinite ease-in-out;
+    }
+
+    .lamp-pane-flash {
+      animation: warnPulsePurple 0.7s infinite ease-in-out;
+    }
+
+    .lamp-routine-flash {
+      animation: warnPulseAmber 1.4s infinite ease-in-out;
+    }
+
+    .cluster-overload-frame {
+      animation: bezelFlash 0.75s infinite ease-in-out;
+    }
+
+    .cluster-pane-frame {
+      animation: bezelFlashPurple 0.8s infinite ease-in-out;
+    }
+
+    ::-webkit-scrollbar {
+      width: 6px;
+      height: 6px;
+    }
+    ::-webkit-scrollbar-track {
+      background: #0d1320;
+    }
+    ::-webkit-scrollbar-thumb {
+      background: #253452;
+      border-radius: 9999px;
+    }
+    ::-webkit-scrollbar-thumb:hover {
+      background: #364b75;
+    }
+    </style>
+</head>
+<body class="bg-cluster-bg text-slate-100 font-sans antialiased selection:bg-sky-500/30 selection:text-sky-200 min-h-screen flex flex-col">
+
+  <!-- Top Header Bar -->
+  <header class="border-b border-cluster-border bg-cluster-panel/90 backdrop-blur sticky top-0 z-30">
+    <div class="max-w-7xl mx-auto px-4 sm:px-6 py-3.5 flex flex-col lg:flex-row lg:items-center lg:justify-between gap-3">
+      <div class="flex items-center gap-3">
+        <div class="w-10 h-10 rounded-xl bg-sky-500/15 border border-sky-400/30 flex items-center justify-center text-sky-400 shrink-0">
+          <svg class="w-6 h-6" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <path d="M12 20a8 8 0 1 0-8-8"></path>
+            <path d="M12 12l4-4"></path>
+            <circle cx="12" cy="12" r="2"></circle>
+            <path d="M4.93 19.07A10 10 0 0 1 2 12"></path>
+          </svg>
+        </div>
+        <div>
+          <div class="flex flex-wrap items-center gap-2">
+            <h1 class="text-base sm:text-lg font-bold tracking-tight text-white">
+              Simulador de Carga e Sobrecarga — Centro Politécnico (UFPR)
+            </h1>
+            <span id="streamStatusBadge" class="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-xs font-semibold bg-emerald-500/15 text-emerald-300 border border-emerald-500/30">
+              <span class="w-2 h-2 rounded-full bg-emerald-400 animate-ping"></span>
+              SIMULAÇÃO ATIVA
+            </span>
+          </div>
+          <p class="text-xs text-slate-400">
+            27 medidores do Centro Politécnico • Simulação de rotina, pico, sobrecarga, desligamento e falha de leitura
+          </p>
+        </div>
+      </div>
+
+      <!-- Quick Global Controls -->
+      <div class="flex flex-wrap items-center gap-2">
+
+        <button id="toggleOffBtn" type="button" class="px-3 py-2 rounded-xl text-xs font-bold bg-slate-700/60 hover:bg-slate-600/70 text-slate-200 border border-slate-500/50 transition cursor-pointer">
+          Medidor Desligado
+        </button>
+
+        <button id="togglePaneBtn" type="button" class="px-3 py-2 rounded-xl text-xs font-bold bg-purple-600/25 hover:bg-purple-600/40 text-purple-200 border border-purple-400/50 transition cursor-pointer">
+          Pane Elétrica
+        </button>
+
+        <button id="triggerOverloadBtn" type="button" class="px-3.5 py-2 rounded-xl text-xs font-bold bg-red-600 hover:bg-red-500 active:scale-[0.99] text-white shadow-lg shadow-red-950/60 border border-red-400/40 transition cursor-pointer flex items-center gap-1.5">
+          <svg class="w-4 h-4 shrink-0" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4">
+            <path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"></path>
+            <line x1="12" y1="9" x2="12" y2="13"></line>
+            <line x1="12" y1="17" x2="12.01" y2="17"></line>
+          </svg>
+          <span id="triggerOverloadText">Simular Sobrecarga</span>
+        </button>
+
+        <button id="multiOverloadBtn" type="button" class="px-3 py-2 rounded-xl text-xs font-bold bg-red-950/60 hover:bg-red-900/70 text-red-200 border border-red-500/60 transition cursor-pointer">
+          Sobrecarga Múltipla (3)
+        </button>
+
+        <button id="resetNormalBtn" type="button" class="px-3 py-2 rounded-xl text-xs font-semibold bg-emerald-600/20 hover:bg-emerald-600/30 text-emerald-300 border border-emerald-500/40 transition cursor-pointer">
+          Restaurar Rotina
+        </button>
+      </div>
+    </div>
+  </header>
+
+  <!-- Main Content -->
+  <main class="flex-1 max-w-7xl w-full mx-auto px-4 sm:px-6 py-6 space-y-6">
+    <!-- Simple Explanation Strip -->
+    <section class="bg-cluster-panel/90 border border-sky-500/30 rounded-2xl p-4 grid grid-cols-1 md:grid-cols-4 gap-3 text-xs">
+      <div class="bg-cluster-card/70 border border-cluster-border rounded-xl p-3">
+        <div class="font-bold text-sky-300 mb-1">1. Escolha o Medidor e Veja a Variação</div>
+        <p class="text-slate-400 leading-relaxed">Selecione um dos 27 medidores do Centro Politécnico para acompanhar sua variação de carga ao longo do tempo.</p>
+      </div>
+      <div class="bg-cluster-card/70 border border-cluster-border rounded-xl p-3">
+        <div class="font-bold text-red-300 mb-1">2. Limiar de Sobrecarga</div>
+        <p class="text-slate-400 leading-relaxed">Pode ser <strong>relativo</strong> (% acima da carga de referência de cada medidor, padrão +30%) ou <strong>fixo</strong> (mesmo valor em kW para todos). Acima dele, dispara o alerta vermelho.</p>
+      </div>
+      <div class="bg-cluster-card/70 border border-cluster-border rounded-xl p-3">
+        <div class="font-bold text-purple-300 mb-1">3. Desligar Medidor e Pane Elétrica</div>
+        <p class="text-slate-400 leading-relaxed"><strong>Desligar Medidor</strong> zera a carga (0,0 kW); <strong>Pane Elétrica</strong> congela a medição atual e ativa o alerta roxo.</p>
+      </div>
+      <div class="bg-cluster-card/70 border border-cluster-border rounded-xl p-3">
+        <div class="font-bold text-emerald-300 mb-1">4. Busca por Código ou Edifício</div>
+        <p class="text-slate-400 leading-relaxed">Digite o código do medidor ou o nome do edifício no campo de busca para filtrar e selecionar o prédio desejado.</p>
+      </div>
+    </section>
+
+    <!-- Meter Selector (All 27) & Threshold Controls Row -->
+    <section class="grid grid-cols-1 xl:grid-cols-12 gap-4">
+      <!-- All 27 Meters Selector -->
+      <div class="xl:col-span-7 bg-cluster-panel border border-cluster-border rounded-2xl p-4 sm:p-5">
+        <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2 mb-3">
+          <div>
+            <h2 class="text-sm font-bold uppercase tracking-wider text-slate-300">Seletor dos 27 Medidores do Campus</h2>
+            <p class="text-xs text-slate-400">Escolha direto na lista ou busque por código (`CCJA`) ou edificação</p>
+          </div>
+          <span class="text-xs font-mono text-sky-400 bg-sky-500/10 border border-sky-500/25 px-2.5 py-1 rounded-lg self-start sm:self-auto">
+            27 Medidores (Centro Politécnico)
+          </span>
+        </div>
+
+        <div class="grid grid-cols-1 sm:grid-cols-12 gap-2.5 mb-3">
+          <div class="sm:col-span-8">
+            <select id="meterDropdown" aria-label="Escolher medidor" class="w-full rounded-xl bg-cluster-card border border-cluster-border text-xs sm:text-sm text-white px-3 py-2.5 focus:outline-none focus:border-sky-400 cursor-pointer">
+              <!-- Populated with all 27 meters -->
+            </select>
+          </div>
+          <div class="sm:col-span-4">
+            <input id="meterSearchInput" type="text" placeholder="Buscar CCJA ou prédio..." class="w-full rounded-xl bg-cluster-card border border-cluster-border text-xs sm:text-sm text-white placeholder-slate-500 px-3 py-2.5 focus:outline-none focus:border-sky-400" />
+          </div>
+        </div>
+
+        <div id="meterSelectorGrid" class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-2 max-h-60 overflow-y-auto pr-1">
+          <!-- Populated dynamically via JS -->
+        </div>
+      </div>
+
+      <!-- Threshold & Simulation Controls -->
+      <div class="xl:col-span-5 bg-cluster-panel border border-cluster-border rounded-2xl p-4 sm:p-5 flex flex-col justify-between gap-4">
+        <div>
+        <div>
+          <h2 class="text-sm font-bold uppercase tracking-wider text-slate-300">Limiares e Variação de Carga</h2>
+          <p class="text-xs text-slate-400">Ajuste o teto de sobrecarga e o comportamento da simulação</p>
+        </div>
+        </div>
+
+        <div class="space-y-4">
+          <!-- Threshold Mode -->
+          <div>
+            <label for="thresholdModeSelect" class="block text-xs font-semibold text-slate-200 mb-1">Tipo de Limiar</label>
+            <select id="thresholdModeSelect" class="w-full rounded-xl bg-cluster-card border border-cluster-border text-xs sm:text-sm text-slate-100 px-3 py-2 focus:outline-none focus:border-sky-400 cursor-pointer">
+              <option value="relative" selected>Relativo à referência de cada medidor (% acima)</option>
+              <option value="fixed">Fixo para todos os medidores (kW)</option>
+            </select>
+          </div>
+
+          <!-- Relative Threshold Slider -->
+          <div id="relativeThresholdBox">
+            <div class="flex items-center justify-between text-xs mb-1.5">
+              <label for="relativeSlider" class="font-semibold text-slate-200">Limiar Relativo (% acima da referência)</label>
+              <span id="relativeValueLabel" class="font-mono font-bold text-red-400 bg-red-500/10 border border-red-500/30 px-2 py-0.5 rounded-md">+30%</span>
+            </div>
+            <input id="relativeSlider" type="range" min="10" max="100" step="5" value="30" class="w-full accent-red-500 cursor-pointer" />
+            <div class="flex justify-between text-[11px] font-mono text-slate-500 mt-1">
+              <span>+10% (Sensível)</span>
+              <span>+30% (Padrão)</span>
+              <span>+100% (Alto)</span>
+            </div>
+          </div>
+
+          <!-- Overload Threshold Slider -->
+          <div id="fixedThresholdBox" class="hidden">
+            <div class="flex items-center justify-between text-xs mb-1.5">
+              <label for="thresholdSlider" class="font-semibold text-slate-200">Limiar de Sobrecarga (kW)</label>
+              <span id="thresholdValueLabel" class="font-mono font-bold text-red-400 bg-red-500/10 border border-red-500/30 px-2 py-0.5 rounded-md">140 kW</span>
+            </div>
+            <input id="thresholdSlider" type="range" min="40" max="240" step="5" value="140" class="w-full accent-red-500 cursor-pointer" />
+            <div class="flex justify-between text-[11px] font-mono text-slate-500 mt-1">
+              <span>40 kW (Sensível)</span>
+              <span>140 kW (Padrão)</span>
+              <span>240 kW (Alto)</span>
+            </div>
+          </div>
+
+          <!-- Routine Mode & Speed -->
+          <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
+            <div>
+              <label for="routineProfileSelect" class="block text-xs font-semibold text-slate-200 mb-1">Variação de Rotina</label>
+              <select id="routineProfileSelect" class="w-full rounded-xl bg-cluster-card border border-cluster-border text-xs sm:text-sm text-slate-100 px-3 py-2 focus:outline-none focus:border-sky-400 cursor-pointer">
+                <option value="normal">Operação Normal (Base)</option>
+                <option value="laboratorio">Picos de Laboratório / Aulas</option>
+                <option value="climatizacao">Sobrecarga Térmica (HVAC)</option>
+                <option value="aleatorio">Eventos Aleatórios de Carga</option>
+              </select>
+            </div>
+
+            <div>
+              <label for="tickSpeedSelect" class="block text-xs font-semibold text-slate-200 mb-1">Ritmo da Simulação</label>
+              <select id="tickSpeedSelect" class="w-full rounded-xl bg-cluster-card border border-cluster-border text-xs sm:text-sm text-slate-100 px-3 py-2 focus:outline-none focus:border-sky-400 cursor-pointer">
+                <option value="1000" selected>1.0 s (Tempo Real)</option>
+                <option value="500">0.5 s (Rápido)</option>
+                <option value="2000">2.0 s (Suave)</option>
+              </select>
+            </div>
+          </div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- Automotive Warning Cluster Hero -->
+    <section id="clusterFrame" class="bg-gradient-to-b from-[#11192b] to-[#0b101c] border-2 border-cluster-border rounded-3xl p-5 sm:p-7 shadow-2xl transition-colors duration-300">
+      <div class="flex flex-col md:flex-row md:items-center md:justify-between gap-4 pb-5 border-b border-slate-800/90">
+        <div>
+          <div class="flex flex-wrap items-center gap-2.5">
+            <span id="clusterMeterCode" class="font-mono text-xs font-bold uppercase tracking-widest px-2.5 py-1 rounded-lg bg-sky-500/15 text-sky-300 border border-sky-500/30">
+              Código: CCJA231
+            </span>
+            <h2 id="clusterMeterName" class="text-xl sm:text-2xl font-extrabold text-white tracking-tight">
+              Edifício: Setor de Ciências Biológicas
+            </h2>
+          </div>
+          <p id="clusterMeterSubtitle" class="text-xs sm:text-sm text-slate-400 mt-1">
+            Medidor CCJA231 • Campus Centro Politécnico (UFPR)
+          </p>
+        </div>
+
+        <!-- Master Status Banner -->
+        <div id="masterStatusBanner" class="px-4 py-2.5 rounded-2xl border flex items-center gap-3 self-start md:self-auto bg-emerald-500/10 border-emerald-500/30 text-emerald-300">
+          <span id="masterStatusDot" class="w-3 h-3 rounded-full bg-emerald-400"></span>
+          <div>
+            <div id="masterStatusLabel" class="text-xs font-extrabold uppercase tracking-wider">ROTINA NORMAL</div>
+            <div id="masterStatusSub" class="text-[11px] opacity-80">Carga dentro dos parâmetros nominais</div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Dials & Automotive Warning Lamps Grid -->
+      <div class="grid grid-cols-1 lg:grid-cols-12 gap-6 pt-6 items-center">
+
+        <!-- Left Dial: Active Power Gauge (kW) -->
+        <div class="lg:col-span-4 flex flex-col items-center justify-center bg-cluster-card/70 border border-cluster-border/80 rounded-2xl p-5">
+          <span class="text-xs font-bold uppercase tracking-widest text-slate-400 mb-2">Potência Ativa Simulada</span>
+          <div class="relative w-52 h-32 flex items-end justify-center">
+            <svg id="powerGaugeSvg" viewBox="0 0 220 130" class="w-full h-full overflow-visible">
+              <path d="M 20 115 A 90 90 0 0 1 200 115" fill="none" stroke="#1e293b" stroke-width="18" stroke-linecap="round"></path>
+              <path d="M 20 115 A 90 90 0 0 1 155 32" fill="none" stroke="#f59e0b" stroke-width="4" stroke-opacity="0.35" stroke-linecap="round"></path>
+              <path d="M 155 32 A 90 90 0 0 1 200 115" fill="none" stroke="#ef4444" stroke-width="6" stroke-opacity="0.5" stroke-linecap="round"></path>
+              <path id="powerGaugeArc" d="M 20 115 A 90 90 0 0 1 20 115" fill="none" stroke="#10b981" stroke-width="18" stroke-linecap="round"></path>
+              <g id="powerGaugeNeedle" transform="translate(110, 115) rotate(-90)">
+                <line x1="0" y1="6" x2="0" y2="-76" stroke="#f8fafc" stroke-width="3.5" stroke-linecap="round"></line>
+                <circle cx="0" cy="0" r="8" fill="#0f172a" stroke="#38bdf8" stroke-width="3"></circle>
+              </g>
+            </svg>
+          </div>
+          <div class="text-center mt-1">
+            <div id="livePowerDisplay" class="font-mono text-3xl sm:text-4xl font-extrabold text-emerald-400">0.0 <span class="text-base font-semibold text-slate-400">kW</span></div>
+            <div id="gaugeScaleInfo" class="text-[11px] font-mono text-slate-400 mt-0.5">Capacidade Máx. Escala: 230 kW</div>
+          </div>
+        </div>
+
+        <!-- Center: Automotive Warning Cluster Lamps (Separados: Sobrecarga, Desligado, Pane/Travou) -->
+        <div class="lg:col-span-4 space-y-2.5">
+          <div class="text-center lg:text-left">
+            <span class="text-xs font-bold uppercase tracking-widest text-slate-400">Indicadores de Advertência (Separados)</span>
+          </div>
+
+          <!-- Indicador 1: Sobrecarga -->
+          <div id="lampOverload" class="rounded-xl border border-slate-700/80 bg-slate-900/80 px-3.5 py-2.5 flex items-center justify-between transition-all">
+            <div class="flex items-center gap-3">
+              <div id="lampOverloadIconBox" class="w-9 h-9 rounded-lg bg-slate-800 border border-slate-700 flex items-center justify-center text-slate-500">
+                <svg class="w-5 h-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2">
+                  <polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"></polygon>
+                </svg>
+              </div>
+              <div>
+                <div class="text-xs font-extrabold uppercase tracking-wider text-white">SOBRECARGA</div>
+                <div id="lampOverloadDesc" class="text-[11px] text-slate-400">Acima do limiar (kW)</div>
+              </div>
+            </div>
+            <span id="lampOverloadState" class="font-mono text-[10px] font-bold px-2 py-0.5 rounded bg-slate-800 text-slate-400">OFF</span>
+          </div>
+
+          <!-- Indicador 2: Medidor Desligado (0 kW) -->
+          <div id="lampOffStateCard" class="rounded-xl border border-slate-700/80 bg-slate-900/80 px-3.5 py-2.5 flex items-center justify-between transition-all">
+            <div class="flex items-center gap-3">
+              <div id="lampOffIconBox" class="w-9 h-9 rounded-lg bg-slate-800 border border-slate-700 flex items-center justify-center text-slate-500">
+                <svg class="w-5 h-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2">
+                  <circle cx="12" cy="12" r="9"></circle>
+                  <line x1="8" y1="12" x2="16" y2="12"></line>
+                </svg>
+              </div>
+              <div>
+                <div class="text-xs font-extrabold uppercase tracking-wider text-white">MEDIDOR DESLIGADO</div>
+                <div class="text-[11px] text-slate-400">Sem alimentação / 0.0 kW</div>
+              </div>
+            </div>
+            <span id="lampOffBadge" class="font-mono text-[10px] font-bold px-2 py-0.5 rounded bg-slate-800 text-slate-400">LIGADO</span>
+          </div>
+
+          <!-- Indicador 3: Pane Elétrica / Travou -->
+          <div id="lampPaneStateCard" class="rounded-xl border border-slate-700/80 bg-slate-900/80 px-3.5 py-2.5 flex items-center justify-between transition-all">
+            <div class="flex items-center gap-3">
+              <div id="lampPaneIconBox" class="w-9 h-9 rounded-lg bg-slate-800 border border-slate-700 flex items-center justify-center text-slate-500">
+                <svg class="w-5 h-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2">
+                  <rect x="6" y="4" width="4" height="16"></rect>
+                  <rect x="14" y="4" width="4" height="16"></rect>
+                </svg>
+              </div>
+              <div>
+                <div class="text-xs font-extrabold uppercase tracking-wider text-white">PANE ELÉTRICA</div>
+                <div id="lampPaneDesc" class="text-[11px] text-slate-400">Leitura congelada na tela</div>
+              </div>
+            </div>
+            <span id="lampPaneBadge" class="font-mono text-[10px] font-bold px-2 py-0.5 rounded bg-slate-800 text-slate-400">OK</span>
+          </div>
+
+          <!-- Indicador 4: Rotina / Pico -->
+          <div id="lampNominal" class="rounded-xl border border-emerald-500/40 bg-emerald-500/10 px-3.5 py-2.5 flex items-center justify-between transition-all">
+            <div class="flex items-center gap-3">
+              <div id="lampNominalIconBox" class="w-9 h-9 rounded-lg bg-emerald-500/20 border border-emerald-400/40 flex items-center justify-center text-emerald-400">
+                <svg class="w-5 h-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2">
+                  <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"></path>
+                  <polyline points="9 12 11 14 15 10"></polyline>
+                </svg>
+              </div>
+              <div>
+                <div id="lampNominalTitle" class="text-xs font-extrabold uppercase tracking-wider text-white">ROTINA NORMAL</div>
+                <div id="lampNominalDesc" class="text-[11px] text-emerald-200/80">Operação estável da rede</div>
+              </div>
+            </div>
+            <span id="lampNominalState" class="font-mono text-[10px] font-bold px-2 py-0.5 rounded bg-emerald-500/20 text-emerald-300">OK</span>
+          </div>
+        </div>
+
+        <!-- Right Dial: Thermal & Load Stress Gauge (%) -->
+        <div class="lg:col-span-4 flex flex-col items-center justify-center bg-cluster-card/70 border border-cluster-border/80 rounded-2xl p-5">
+          <span class="text-xs font-bold uppercase tracking-widest text-slate-400 mb-2">Carga vs. Limiar de Alerta</span>
+          <div class="relative w-52 h-32 flex items-end justify-center">
+            <svg viewBox="0 0 220 130" class="w-full h-full overflow-visible">
+              <path d="M 20 115 A 90 90 0 0 1 200 115" fill="none" stroke="#1e293b" stroke-width="18" stroke-linecap="round"></path>
+              <path id="loadRatioArc" d="M 20 115 A 90 90 0 0 1 20 115" fill="none" stroke="#10b981" stroke-width="18" stroke-linecap="round"></path>
+              <g id="loadRatioNeedle" transform="translate(110, 115) rotate(-90)">
+                <line x1="0" y1="6" x2="0" y2="-76" stroke="#f8fafc" stroke-width="3.5" stroke-linecap="round"></line>
+                <circle cx="0" cy="0" r="8" fill="#0f172a" stroke="#a78bfa" stroke-width="3"></circle>
+              </g>
+            </svg>
+          </div>
+          <div class="text-center mt-1">
+            <div id="liveLoadRatioDisplay" class="font-mono text-3xl sm:text-4xl font-extrabold text-sky-400">0%</div>
+            <div id="liveCurrentVoltageDisplay" class="text-[11px] font-mono text-slate-400 mt-0.5">Corrente: 0 A • FP: 0.96</div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- Active Alerts Strip -->
+    <section class="bg-cluster-panel border border-cluster-border rounded-2xl p-4 sm:p-5">
+      <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2 mb-3">
+        <div>
+          <h3 class="text-sm sm:text-base font-bold text-white">Medidores em Alerta Agora</h3>
+          <p class="text-xs text-slate-400">Clique em um medidor para abri-lo no painel. Use o código e o nome para localizar o prédio no modelo 3D.</p>
+        </div>
+        <span id="activeAlertsCountBadge" class="text-xs font-mono font-bold px-2.5 py-1 rounded-lg bg-emerald-500/15 text-emerald-300 border border-emerald-500/30 self-start sm:self-auto">Nenhum alerta</span>
+      </div>
+      <div id="activeAlertsList" class="flex flex-wrap gap-2"></div>
+    </section>
+
+    <!-- Live Telemetry Chart & Event Log Row -->
+    <section class="grid grid-cols-1 lg:grid-cols-12 gap-5">
+      <div class="lg:col-span-8 bg-cluster-panel border border-cluster-border rounded-2xl p-4 sm:p-5 flex flex-col">
+        <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2 mb-4">
+          <div>
+            <h3 class="text-sm sm:text-base font-bold text-white">Curva de Telemetria em Tempo Real (kW)</h3>
+            <p id="chartSubtitleText" class="text-xs text-slate-400">Linha tracejada vermelha indica o limiar de sobrecarga configurado</p>
+          </div>
+          <div class="flex items-center gap-4 text-xs">
+            <span class="inline-flex items-center gap-1.5 text-slate-300">
+              <span class="w-3 h-1 rounded-full bg-sky-400"></span> Carga (kW)
+            </span>
+            <span class="inline-flex items-center gap-1.5 text-red-300">
+              <span class="w-3 h-0.5 border-t-2 border-dashed border-red-500"></span> Limiar
+            </span>
+          </div>
+        </div>
+
+        <div class="relative w-full h-64 sm:h-72 bg-cluster-card/60 rounded-xl border border-cluster-border/70 overflow-hidden">
+          <canvas id="telemetryCanvas" class="block w-full h-full"></canvas>
+        </div>
+      </div>
+
+      <div class="lg:col-span-4 bg-cluster-panel border border-cluster-border rounded-2xl p-4 sm:p-5 flex flex-col">
+        <div class="flex items-center justify-between mb-3">
+          <div>
+            <h3 class="text-sm sm:text-base font-bold text-white">Registro de Eventos</h3>
+            <p class="text-xs text-slate-400">Sobrecarga, desligamento, pane elétrica e rotina</p>
+          </div>
+          <button id="clearLogBtn" type="button" class="text-xs text-slate-400 hover:text-white px-2.5 py-1 rounded-lg bg-cluster-card border border-cluster-border transition cursor-pointer">
+            Limpar
+          </button>
+        </div>
+
+        <div id="eventLogList" class="flex-1 max-h-64 sm:max-h-72 overflow-y-auto space-y-2 pr-1">
+          <!-- Populated dynamically via JS -->
+        </div>
+      </div>
+    </section>
+    <!-- Final Section: Total Load & Meter Comparison Chart -->
+    <section class="bg-cluster-panel border border-cluster-border rounded-2xl p-4 sm:p-5 space-y-4">
+      <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2">
+        <div>
+          <h3 class="text-sm sm:text-base font-bold text-white">Comparativo de Carga entre Medidores e Consumo Total</h3>
+          <p class="text-xs text-slate-400">Soma instantânea da potência simulada (kW) neste instante — não é acumulado mensal nem anual (kWh). Eixo horizontal identificado pelo código do medidor (CCJA).</p>
+        </div>
+        <div class="flex flex-wrap items-center gap-2 text-xs font-mono">
+          <span id="totalCampusKwBadge" class="px-3 py-1.5 rounded-xl bg-sky-500/15 text-sky-300 border border-sky-500/30 font-bold">
+            Soma Instantânea: 0.0 kW
+          </span>
+          <span id="activeMetersCountBadge" class="px-3 py-1.5 rounded-xl bg-emerald-500/15 text-emerald-300 border border-emerald-500/30 font-semibold">
+            27 Ligados
+          </span>
+        </div>
+      </div>
+
+      <div class="grid grid-cols-1 sm:grid-cols-3 gap-3 text-xs">
+        <div class="bg-cluster-card/70 border border-cluster-border rounded-xl p-3">
+          <div class="text-slate-400 font-semibold">Soma Instantânea da Carga (kW — Tempo Real)</div>
+          <div id="summaryTotalKw" class="font-mono text-lg font-extrabold text-white mt-0.5">0.0 kW</div>
+          <div class="text-[11px] text-slate-400 mt-1 leading-snug">Soma da potência ativa (kW) simulada agora nos 27 medidores (carga instantânea, sem janela de mês ou ano).</div>
+        </div>
+        <div class="bg-cluster-card/70 border border-cluster-border rounded-xl p-3">
+          <div class="text-slate-400 font-semibold">Maior Carga no Momento (Código e Edifício)</div>
+          <div id="summaryTopMeter" class="font-mono text-sm font-bold text-amber-300 mt-1 truncate">—</div>
+          <div id="summaryTopMeterName" class="text-[11px] text-slate-400 mt-1 truncate">—</div>
+        </div>
+        <div class="bg-cluster-card/70 border border-cluster-border rounded-xl p-3">
+          <div class="text-slate-400 font-semibold">Medidores em Sobrecarga / Pane / Off</div>
+          <div id="summaryAlertsCount" class="font-mono text-sm font-bold text-slate-200 mt-1">0 / 0 / 0</div>
+          <div class="text-[11px] text-slate-400 mt-1">Contagem atual entre os 27 medidores do campus.</div>
+        </div>
+      </div>
+
+      <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2">
+        <div class="flex flex-wrap items-center gap-2 text-xs">
+          <label for="compareModeSelect" class="text-slate-400 font-medium">Exibir:</label>
+          <select id="compareModeSelect" class="rounded-xl bg-cluster-card border border-cluster-border text-xs text-white px-3 py-1.5 focus:outline-none focus:border-sky-400 cursor-pointer">
+            <option value="top12" selected>Top 12 maiores cargas (kW)</option>
+            <option value="all27">Todos os 27 medidores (kW)</option>
+          </select>
+          <span class="text-[11px] text-slate-400">Eixo X: <strong class="text-slate-200">Código do medidor</strong> (ex.: CCJA231)</span>
+        </div>
+        <div class="flex items-center gap-3 text-[11px] text-slate-400">
+          <span class="inline-flex items-center gap-1"><span class="w-2.5 h-2.5 rounded-sm bg-emerald-400"></span> Normal</span>
+          <span class="inline-flex items-center gap-1"><span class="w-2.5 h-2.5 rounded-sm bg-amber-400"></span> Pico</span>
+          <span class="inline-flex items-center gap-1"><span class="w-2.5 h-2.5 rounded-sm bg-red-500"></span> Sobrecarga</span>
+          <span class="inline-flex items-center gap-1"><span class="w-2.5 h-2.5 rounded-sm bg-purple-400"></span> Pane</span>
+        </div>
+      </div>
+
+      <div class="relative w-full h-72 bg-cluster-card/60 rounded-xl border border-cluster-border/70 overflow-hidden">
+        <canvas id="comparisonCanvas" class="block w-full h-full"></canvas>
+      </div>
+    </section>
+  </main>
+
+  <footer class="border-t border-cluster-border bg-cluster-panel/80">
+    <div class="max-w-7xl mx-auto px-4 sm:px-6 py-4 text-[11px] text-slate-400 leading-relaxed">
+      <strong class="text-slate-300">Nota:</strong> simulador com finalidade demonstrativa. Os dados dos medidores são estáticos (Projeto Energi, 2022–2023) e os valores de potência exibidos são gerados pelo simulador, não representando leituras em tempo real.
+    </div>
+  </footer>
+
+  <script>
+    const RAW_METERS_27 = [{"id": "CCJA231", "nome": "Setor de Ciências Biológicas", "local": "Centro Politécnico", "med2022": 50421.7, "med2023": 53745.5, "baseKw": 108.2, "maxScaleKw": 230, "currentKw": 108.2, "serie2023": [63211.0, 60787.0, 72661.0, 54748.0, 54053.0, 47266.0, 35861.0, 49122.0, 52880.0, 56507.0, 59628.0, 38222.0], "serie2022": [53552.0, 44526.0, 38143.0, 40556.0, 48717.0, 49162.0, 53175.0, 56394.0, 50688.0, 54626.0, 56512.0, 59009.0]}, {"id": "CCJA315", "nome": "Prefeitura da Cidade Universitária - SUINFRA", "local": "Centro Politécnico", "med2022": 34947.8, "med2023": 32206.7, "baseKw": 64.9, "maxScaleKw": 140, "currentKw": 64.9, "serie2023": [37695.0, 36011.0, 38084.0, 33523.0, 35363.0, 35166.0, 27018.0, 36942.0, 37378.0, 32265.0, 27857.0, 9177.0], "serie2022": [33172.0, 35302.0, 40301.0, 35766.0, 41675.0, 31599.0, 37950.0, 36554.0, 25034.0, 32273.0, 34955.0, 34791.0]}, {"id": "CCJA215", "nome": "Edifício de Administração", "local": "Centro Politécnico", "med2022": 36926.5, "med2023": 30457.1, "baseKw": 61.3, "maxScaleKw": 130, "currentKw": 61.3, "serie2023": [34686.0, 31522.0, 35327.0, 31446.0, 33036.0, 28795.0, 22513.0, 30866.0, 32403.0, 32716.0, 31732.0, 20442.0], "serie2022": [39316.0, 35728.0, 40280.0, 33622.0, 35138.0, 38179.0, 39661.0, 37213.0, 36109.0, 37952.0, 35209.0, 34710.0]}, {"id": "CCJA158", "nome": "Informática - Bloco PA (antigo salão de provas)", "local": "Centro Politécnico", "med2022": 25998.2, "med2023": 23650.1, "baseKw": 47.6, "maxScaleKw": 120, "currentKw": 47.6, "serie2023": [26146.0, 23707.0, 26610.0, 26466.0, 27939.0, 23689.0, 18516.0, 24519.0, 23673.0, 25485.0, 22197.0, 14855.0], "serie2022": [25518.0, 21985.0, 25855.0, 22163.0, 25513.0, 23247.0, 28468.0, 27836.0, 28272.0, 30137.0, 26100.0, 26885.0]}, {"id": "CCJA345", "nome": "Usina Piloto de Tecnologia Química A", "local": "Centro Politécnico", "med2022": 20730.1, "med2023": 19372.3, "baseKw": 39.0, "maxScaleKw": 120, "currentKw": 39.0, "serie2023": [20074.0, 19536.0, 23069.0, 18133.0, 20222.0, 19321.0, 13707.0, 21436.0, 20918.0, 20492.0, 21471.0, 14088.0], "serie2022": [20170.0, 21224.0, 25953.0, 19919.0, 22862.0, 20674.0, 19404.0, 20458.0, 19236.0, 21135.0, 19427.0, 18300.0]}, {"id": "CCJA346", "nome": "Ru Politécnico", "local": "Centro Politécnico", "med2022": 9352.1, "med2023": 17221.1, "baseKw": 34.7, "maxScaleKw": 120, "currentKw": 34.7, "serie2023": [0.0, 17129.0, 21452.0, 20662.0, 25696.0, 22297.0, 8035.0, 23331.0, 21644.0, 20738.0, 16895.0, 8775.0], "serie2022": [30.0, 0.0, 0.0, 2922.0, 11145.0, 19971.0, 22248.0, 23012.0, 15898.0, 15750.0, 1247.0, 0.0]}, {"id": "CCJA334", "nome": "Lamir/Laboratório de Máquinas Hidráulicas/Laboratório de Motores Térmicos", "local": "Centro Politécnico", "med2022": 11965.3, "med2023": 0, "baseKw": 22.0, "maxScaleKw": 120, "currentKw": 22.0, "serie2023": [0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0], "serie2022": [19384.0, 5004.0, 0.0, 2760.0, 10720.0, 17818.0, 20588.0, 22535.0, 18291.0, 20283.0, 6201.0, 0.0]}, {"id": "CCJA359", "nome": "Lame / Cesec", "local": "Centro Politécnico", "med2022": 11524.1, "med2023": 0, "baseKw": 22.0, "maxScaleKw": 120, "currentKw": 22.0, "serie2023": [0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0], "serie2022": [15288.0, 3564.0, 0.0, 2666.0, 10259.0, 19233.0, 21253.0, 23740.0, 20574.0, 20458.0, 1256.0, 0.0]}, {"id": "CCJA347", "nome": "Usina Piloto de Tecnologia Química B", "local": "Centro Politécnico", "med2022": 8011.3, "med2023": 10975.4, "baseKw": 22.1, "maxScaleKw": 120, "currentKw": 22.1, "serie2023": [0.0, 13501.0, 15538.0, 11836.0, 12589.0, 10105.0, 9335.0, 12704.0, 12635.0, 11877.0, 12306.0, 9278.0], "serie2022": [10810.0, 10369.0, 10524.0, 7958.0, 8556.0, 8227.0, 8673.0, 9348.0, 7940.0, 9533.0, 4198.0, 0.0]}, {"id": "CCJA325", "nome": "Setor de Educação Profissional e Tecnológica", "local": "Centro Politécnico", "med2022": 10395.5, "med2023": 9691.3, "baseKw": 22.0, "maxScaleKw": 120, "currentKw": 22.0, "serie2023": [8761.0, 9086.0, 9744.0, 9438.0, 11036.0, 9027.0, 5478.0, 12955.0, 11917.0, 11091.0, 11857.0, 5906.0], "serie2022": [6795.0, 9031.0, 12901.0, 10324.0, 9759.0, 11776.0, 12584.0, 13220.0, 9953.0, 11133.0, 9468.0, 7801.0]}, {"id": "CCJA358", "nome": "Farmacologia", "local": "Centro Politécnico", "med2022": 7873.1, "med2023": 0, "baseKw": 22.0, "maxScaleKw": 120, "currentKw": 22.0, "serie2023": [0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0], "serie2022": [12819.0, 4086.0, 0.0, 1656.0, 7229.0, 13693.0, 14093.0, 15183.0, 14666.0, 11052.0, 0.0, 0.0]}, {"id": "CCJA349", "nome": "Engenharia Química", "local": "Centro Politécnico", "med2022": 7859.7, "med2023": 7650.8, "baseKw": 22.0, "maxScaleKw": 120, "currentKw": 22.0, "serie2023": [6170.0, 7958.0, 7687.0, 8248.0, 9414.0, 8735.0, 5757.0, 8834.0, 8636.0, 8489.0, 8109.0, 3773.0], "serie2022": [2810.0, 6479.0, 9033.0, 8003.0, 7017.0, 8751.0, 9434.0, 10813.0, 8039.0, 8302.0, 8762.0, 6872.0]}, {"id": "CCJA214", "nome": "Novo Bloco Exatas", "local": "Centro Politécnico", "med2022": 5525.8, "med2023": 5906.5, "baseKw": 22.0, "maxScaleKw": 120, "currentKw": 22.0, "serie2023": [4182.0, 5282.0, 6666.0, 6140.0, 7501.0, 7145.0, 3572.0, 7818.0, 6652.0, 6481.0, 6426.0, 3013.0], "serie2022": [2464.0, 4784.0, 7286.0, 6076.0, 5483.0, 6251.0, 6329.0, 6959.0, 5267.0, 5544.0, 5202.0, 4663.0]}, {"id": "CCJA343", "nome": "Química Bloco I", "local": "Centro Politécnico", "med2022": 5824.1, "med2023": 0, "baseKw": 22.0, "maxScaleKw": 120, "currentKw": 22.0, "serie2023": [0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0], "serie2022": [40497.0, 9146.0, 0.0, 5629.0, 14617.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0]}, {"id": "CCJA350", "nome": "Bloco de Sala de Aula Ciências Exatas - PC", "local": "Centro Politécnico", "med2022": 3066.0, "med2023": 2910.2, "baseKw": 22.0, "maxScaleKw": 120, "currentKw": 22.0, "serie2023": [2867.0, 2677.0, 2801.0, 3087.0, 3645.0, 3314.0, 1657.0, 3367.0, 3527.0, 3260.0, 3289.0, 1430.0], "serie2022": [902.0, 2728.0, 4160.0, 3380.0, 2853.0, 3232.0, 3566.0, 3801.0, 2604.0, 3200.0, 3232.0, 3135.0]}, {"id": "CCJA353", "nome": "Engenharia Elétrica - PL", "local": "Centro Politécnico", "med2022": 2496.7, "med2023": 2627.3, "baseKw": 22.0, "maxScaleKw": 120, "currentKw": 22.0, "serie2023": [2528.0, 2595.0, 2638.0, 2803.0, 3022.0, 2917.0, 1881.0, 3243.0, 2969.0, 2771.0, 2699.0, 1461.0], "serie2022": [1272.0, 1729.0, 2475.0, 2659.0, 2775.0, 2988.0, 3020.0, 3302.0, 2834.0, 2695.0, 1507.0, 2704.0]}, {"id": "CCJA264", "nome": "Edifício Camil Gemael - Bloco de Sala de Aula Ciências da Terra", "local": "Centro Politécnico", "med2022": 2417.8, "med2023": 2556.3, "baseKw": 22.0, "maxScaleKw": 120, "currentKw": 22.0, "serie2023": [1693.0, 2058.0, 2341.0, 2560.0, 3188.0, 3522.0, 1023.0, 3239.0, 3295.0, 2974.0, 3250.0, 1532.0], "serie2022": [829.0, 2303.0, 3295.0, 2519.0, 2144.0, 2808.0, 2477.0, 3677.0, 2597.0, 2260.0, 2026.0, 2082.0]}, {"id": "CCJA162", "nome": "Engenharia Elétrica - PK", "local": "Centro Politécnico", "med2022": 2204.6, "med2023": 2382.8, "baseKw": 22.0, "maxScaleKw": 120, "currentKw": 22.0, "serie2023": [2400.0, 1896.0, 1287.0, 2190.0, 2791.0, 2521.0, 1392.0, 2849.0, 3301.0, 3315.0, 3002.0, 1650.0], "serie2022": [299.0, 2172.0, 3161.0, 2066.0, 2339.0, 2557.0, 2375.0, 3472.0, 2939.0, 2022.0, 1389.0, 1665.0]}, {"id": "CCJA161", "nome": "Edifício João José Bigarella", "local": "Centro Politécnico", "med2022": 2134.6, "med2023": 2232.1, "baseKw": 22.0, "maxScaleKw": 120, "currentKw": 22.0, "serie2023": [1914.0, 1875.0, 1953.0, 2220.0, 2633.0, 2658.0, 1239.0, 2703.0, 2772.0, 2680.0, 2783.0, 1354.0], "serie2022": [1252.0, 1779.0, 2449.0, 2160.0, 1933.0, 2371.0, 2251.0, 3117.0, 2201.0, 2069.0, 2034.0, 1998.0]}, {"id": "CCJA333", "nome": "Complexo Rubens Meister - PF", "local": "Centro Politécnico", "med2022": 891.3, "med2023": 960.9, "baseKw": 22.0, "maxScaleKw": 120, "currentKw": 22.0, "serie2023": [751.0, 1290.0, 1031.0, 1278.0, 1379.0, 1099.0, 390.0, 1194.0, 862.0, 1037.0, 825.0, 397.0], "serie2022": [99.0, 411.0, 1080.0, 891.0, 498.0, 1071.0, 1459.0, 1516.0, 711.0, 899.0, 1126.0, 936.0]}, {"id": "CCJA338", "nome": "Complexo Rubens Meister - PE", "local": "Centro Politécnico", "med2022": 917.6, "med2023": 880.5, "baseKw": 22.0, "maxScaleKw": 120, "currentKw": 22.0, "serie2023": [715.0, 778.0, 729.0, 866.0, 1319.0, 821.0, 649.0, 1253.0, 930.0, 963.0, 1014.0, 531.0], "serie2022": [547.0, 633.0, 843.0, 761.0, 831.0, 947.0, 1176.0, 1307.0, 952.0, 1182.0, 1157.0, 675.0]}, {"id": "CCJA209", "nome": "Biblioteca do Setor de Tecnologia", "local": "Centro Politécnico", "med2022": 1233.4, "med2023": 860.7, "baseKw": 22.0, "maxScaleKw": 120, "currentKw": 22.0, "serie2023": [654.0, 627.0, 441.0, 786.0, 1350.0, 1027.0, 553.0, 857.0, 1211.0, 1200.0, 1193.0, 429.0], "serie2022": [529.0, 3254.0, 3921.0, 892.0, 640.0, 534.0, 1034.0, 940.0, 950.0, 750.0, 553.0, 804.0]}, {"id": "CCJA340", "nome": "Complexo Rubens Meister - PG", "local": "Centro Politécnico", "med2022": 857.9, "med2023": 830.0, "baseKw": 22.0, "maxScaleKw": 120, "currentKw": 22.0, "serie2023": [818.0, 940.0, 837.0, 900.0, 1085.0, 925.0, 366.0, 1164.0, 901.0, 834.0, 871.0, 319.0], "serie2022": [143.0, 687.0, 1162.0, 827.0, 601.0, 1046.0, 1156.0, 1228.0, 703.0, 874.0, 976.0, 892.0]}, {"id": "CCJA354", "nome": "Complexo Rubens Meister - PD", "local": "Centro Politécnico", "med2022": 652.0, "med2023": 732.2, "baseKw": 22.0, "maxScaleKw": 120, "currentKw": 22.0, "serie2023": [671.0, 746.0, 896.0, 852.0, 973.0, 1050.0, 247.0, 784.0, 875.0, 760.0, 621.0, 312.0], "serie2022": [243.0, 401.0, 625.0, 530.0, 475.0, 792.0, 953.0, 1057.0, 450.0, 653.0, 758.0, 888.0]}, {"id": "CCJA194", "nome": "Complexo Rubens Meister - PH", "local": "Centro Politécnico", "med2022": 287.1, "med2023": 343.5, "baseKw": 22.0, "maxScaleKw": 120, "currentKw": 22.0, "serie2023": [283.0, 343.0, 339.0, 340.0, 405.0, 402.0, 232.0, 432.0, 410.0, 375.0, 388.0, 175.0], "serie2022": [206.0, 259.0, 373.0, 335.0, 299.0, 358.0, 327.0, 319.0, 148.0, 279.0, 283.0, 258.0]}, {"id": "CCJA329", "nome": "Complexo Rubens Meister  - PI", "local": "Centro Politécnico", "med2022": 1040.8, "med2023": 267.8, "baseKw": 22.0, "maxScaleKw": 120, "currentKw": 22.0, "serie2023": [486.0, 586.0, 437.0, 580.0, 704.0, 420.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0], "serie2022": [1139.0, 1188.0, 1528.0, 1250.0, 1391.0, 1542.0, 1101.0, 842.0, 659.0, 626.0, 628.0, 594.0]}, {"id": "CCJA218", "nome": "Química Bloco II", "local": "Centro Politécnico", "med2022": 211.5, "med2023": 34.2, "baseKw": 22.0, "maxScaleKw": 120, "currentKw": 22.0, "serie2023": [16.0, 19.0, 29.0, 14.0, 15.0, 13.0, 261.0, 13.0, 11.0, 8.0, 7.0, 5.0], "serie2022": [524.0, 565.0, 529.0, 350.0, 239.0, 148.0, 62.0, 45.0, 30.0, 17.0, 17.0, 12.0]}];
+    const HISTORY_LENGTH = 45;
+
+    const state = {
+      meters: RAW_METERS_27.map((m, idx) => ({
+        ...m,
+        overloadTicksRemaining: 0,
+        forcedOverload: false,
+        isOff: false,
+        isPane: false,
+        frozenKw: null,
+        prevState: 'NORMAL',
+        history: Array.from({ length: HISTORY_LENGTH }, (_, hIdx) => {
+          const wave = Math.sin(hIdx * 0.35 + idx) * 4 + (Math.random() - 0.5) * 3;
+          return Math.max(8, Number((m.baseKw + wave).toFixed(1)));
+        })
+      })),
+      selectedMeterId: RAW_METERS_27[0] ? RAW_METERS_27[0].id : 'CCJA231',
+      searchQuery: '',
+      overloadThresholdKw: 140,
+      thresholdMode: 'relative',
+      relativePct: 30,
+      routineProfile: 'normal',
+      tickIntervalMs: 1000,
+      isRunning: true,
+      timerId: null,
+      logs: []
+    };
+
+    const els = {
+      meterDropdown: document.getElementById('meterDropdown'),
+      meterSearchInput: document.getElementById('meterSearchInput'),
+      meterSelectorGrid: document.getElementById('meterSelectorGrid'),
+      thresholdSlider: document.getElementById('thresholdSlider'),
+      thresholdModeSelect: document.getElementById('thresholdModeSelect'),
+      relativeSlider: document.getElementById('relativeSlider'),
+      relativeValueLabel: document.getElementById('relativeValueLabel'),
+      relativeThresholdBox: document.getElementById('relativeThresholdBox'),
+      fixedThresholdBox: document.getElementById('fixedThresholdBox'),
+      multiOverloadBtn: document.getElementById('multiOverloadBtn'),
+      triggerOverloadText: document.getElementById('triggerOverloadText'),
+      activeAlertsList: document.getElementById('activeAlertsList'),
+      activeAlertsCountBadge: document.getElementById('activeAlertsCountBadge'),
+      summaryTopMeterName: document.getElementById('summaryTopMeterName'),
+      thresholdValueLabel: document.getElementById('thresholdValueLabel'),
+      routineProfileSelect: document.getElementById('routineProfileSelect'),
+      tickSpeedSelect: document.getElementById('tickSpeedSelect'),
+      toggleStreamBtn: document.getElementById('toggleStreamBtn'),
+      streamBtnIcon: document.getElementById('streamBtnIcon'),
+      streamBtnText: document.getElementById('streamBtnText'),
+      streamStatusBadge: document.getElementById('streamStatusBadge'),
+      toggleOffBtn: document.getElementById('toggleOffBtn'),
+      togglePaneBtn: document.getElementById('togglePaneBtn'),
+      triggerOverloadBtn: document.getElementById('triggerOverloadBtn'),
+      resetNormalBtn: document.getElementById('resetNormalBtn'),
+      clusterFrame: document.getElementById('clusterFrame'),
+      clusterMeterCode: document.getElementById('clusterMeterCode'),
+      clusterMeterName: document.getElementById('clusterMeterName'),
+      clusterMeterSubtitle: document.getElementById('clusterMeterSubtitle'),
+      masterStatusBanner: document.getElementById('masterStatusBanner'),
+      masterStatusDot: document.getElementById('masterStatusDot'),
+      masterStatusLabel: document.getElementById('masterStatusLabel'),
+      masterStatusSub: document.getElementById('masterStatusSub'),
+      livePowerDisplay: document.getElementById('livePowerDisplay'),
+      gaugeScaleInfo: document.getElementById('gaugeScaleInfo'),
+      powerGaugeArc: document.getElementById('powerGaugeArc'),
+      powerGaugeNeedle: document.getElementById('powerGaugeNeedle'),
+      loadRatioArc: document.getElementById('loadRatioArc'),
+      loadRatioNeedle: document.getElementById('loadRatioNeedle'),
+      liveLoadRatioDisplay: document.getElementById('liveLoadRatioDisplay'),
+      liveCurrentVoltageDisplay: document.getElementById('liveCurrentVoltageDisplay'),
+      lampOverload: document.getElementById('lampOverload'),
+      lampOverloadIconBox: document.getElementById('lampOverloadIconBox'),
+      lampOverloadDesc: document.getElementById('lampOverloadDesc'),
+      lampOverloadState: document.getElementById('lampOverloadState'),
+      lampRoutine: document.getElementById('lampRoutine'),
+      lampRoutineTitle: document.getElementById('lampRoutineTitle'),
+      lampRoutineIconBox: document.getElementById('lampRoutineIconBox'),
+      lampRoutineDesc: document.getElementById('lampRoutineDesc'),
+      lampRoutineState: document.getElementById('lampRoutineState'),
+      lampNominal: document.getElementById('lampNominal'),
+      lampNominalTitle: document.getElementById('lampNominalTitle'),
+      lampNominalIconBox: document.getElementById('lampNominalIconBox'),
+      lampNominalDesc: document.getElementById('lampNominalDesc'),
+      lampNominalState: document.getElementById('lampNominalState'),
+      lampOffStateCard: document.getElementById('lampOffStateCard'),
+      lampOffIconBox: document.getElementById('lampOffIconBox'),
+      lampOffBadge: document.getElementById('lampOffBadge'),
+      lampPaneStateCard: document.getElementById('lampPaneStateCard'),
+      lampPaneIconBox: document.getElementById('lampPaneIconBox'),
+      lampPaneDesc: document.getElementById('lampPaneDesc'),
+      lampPaneBadge: document.getElementById('lampPaneBadge'),
+      chartSubtitleText: document.getElementById('chartSubtitleText'),
+      telemetryCanvas: document.getElementById('telemetryCanvas'),
+      eventLogList: document.getElementById('eventLogList'),
+      clearLogBtn: document.getElementById('clearLogBtn'),
+      comparisonCanvas: document.getElementById('comparisonCanvas'),
+      compareModeSelect: document.getElementById('compareModeSelect'),
+      totalCampusKwBadge: document.getElementById('totalCampusKwBadge'),
+      activeMetersCountBadge: document.getElementById('activeMetersCountBadge'),
+      summaryTotalKw: document.getElementById('summaryTotalKw'),
+      summaryTopMeter: document.getElementById('summaryTopMeter'),
+      summaryAlertsCount: document.getElementById('summaryAlertsCount')
+    };
+
+    function getSelectedMeter() {
+      return state.meters.find((m) => m.id === state.selectedMeterId) || state.meters[0];
+    }
+
+    // Limiar de sobrecarga do medidor: relativo (% acima da carga de referência) ou fixo (kW)
+    function getThreshold(meter) {
+      if (state.thresholdMode === 'relative') {
+        return Number((meter.baseKw * (1 + state.relativePct / 100)).toFixed(1));
+      }
+      return state.overloadThresholdKw;
+    }
+
+    // Escala do medidor: amplia automaticamente se o limiar estiver acima da escala original
+    function getScaleMax(meter) {
+      return Math.max(meter.maxScaleKw, getThreshold(meter) * 1.4);
+    }
+
+    function thresholdLabel() {
+      return state.thresholdMode === 'relative' ? `+${state.relativePct}% da referência` : `${state.overloadThresholdKw} kW`;
+    }
+
+    function getMeterStatus(meter) {
+      const threshold = getThreshold(meter);
+      if (meter.isOff) return 'OFF';
+      if (meter.isPane) return 'PANE';
+      if (meter.currentKw >= threshold) return 'OVERLOAD';
+      if (meter.currentKw >= threshold * 0.9) return 'ROUTINE_PEAK';
+      return 'NORMAL';
+    }
+
+    function getTimestamp() {
+      return new Date().toTimeString().split(' ')[0];
+    }
+
+    function pushLog(type, meterId, message) {
+      state.logs.unshift({
+        id: `${Date.now()}-${Math.random()}`,
+        time: getTimestamp(),
+        type,
+        meterId,
+        message
+      });
+      if (state.logs.length > 50) state.logs.pop();
+      renderEventLog();
+    }
+
+    function stepSimulation() {
+      const profile = state.routineProfile;
+
+      state.meters.forEach((meter, index) => {
+        const threshold = getThreshold(meter);
+        if (meter.isOff) {
+          meter.currentKw = 0;
+          meter.history.push(0);
+          if (meter.history.length > HISTORY_LENGTH) meter.history.shift();
+          return;
+        }
+
+        if (meter.isPane) {
+          if (meter.frozenKw === null) meter.frozenKw = meter.currentKw;
+          meter.currentKw = meter.frozenKw;
+          meter.history.push(meter.frozenKw);
+          if (meter.history.length > HISTORY_LENGTH) meter.history.shift();
+          return;
+        }
+
+        let nextKw = meter.currentKw;
+
+        if (meter.forcedOverload || meter.overloadTicksRemaining > 0) {
+          if (!meter.forcedOverload) meter.overloadTicksRemaining -= 1;
+          const surgeOffset = (Math.random() - 0.35) * threshold * 0.08;
+          nextKw = threshold * 1.15 + surgeOffset;
+        } else {
+          const timePhase = Date.now() / 1200 + index * 1.1;
+          // variações proporcionais à carga de referência de cada medidor
+          let targetBase = meter.baseKw * (1 + Math.sin(timePhase) * 0.06);
+          let jitter = (Math.random() - 0.5) * meter.baseKw * 0.06;
+
+          if (profile === 'laboratorio') {
+            const peakWave = Math.sin(Date.now() / 2000 + index) > 0.45 ? 0.24 : 0.06;
+            targetBase += meter.baseKw * peakWave;
+          } else if (profile === 'climatizacao') {
+            targetBase += meter.baseKw * 0.2;
+            jitter += Math.random() * meter.baseKw * 0.08;
+          } else if (profile === 'aleatorio') {
+            if (Math.random() < 0.03) {
+              meter.overloadTicksRemaining = 5;
+              nextKw = threshold * 1.15;
+            }
+          }
+
+          if (meter.overloadTicksRemaining === 0) {
+            nextKw = targetBase + jitter;
+          }
+        }
+
+        nextKw = Math.max(1, Math.min(getScaleMax(meter) * 0.98, Number(nextKw.toFixed(1))));
+        meter.currentKw = nextKw;
+        meter.history.push(nextKw);
+        if (meter.history.length > HISTORY_LENGTH) meter.history.shift();
+
+        const newStatus = getMeterStatus(meter);
+        if (newStatus !== meter.prevState) {
+          if (newStatus === 'OVERLOAD') {
+            pushLog('OVERLOAD', meter.id, `SOBRECARGA em ${meter.id} (${meter.nome}): ${nextKw.toFixed(1)} kW >= limiar de ${threshold} kW`);
+          } else if (newStatus === 'ROUTINE_PEAK' && meter.prevState === 'NORMAL') {
+            pushLog('ROUTINE_PEAK', meter.id, `Pico de rotina em ${meter.id}: ${nextKw.toFixed(1)} kW`);
+          } else if (newStatus === 'NORMAL' && meter.prevState === 'OVERLOAD') {
+            pushLog('NORMAL', meter.id, `Carga normalizada em ${meter.id}: ${nextKw.toFixed(1)} kW`);
+          }
+          meter.prevState = newStatus;
+        }
+      });
+
+    renderAll();
+    }
+
+    function toggleMeterOff() {
+      const meter = getSelectedMeter();
+      if (!meter) return;
+      meter.isOff = !meter.isOff;
+      if (meter.isOff) {
+        meter.isPane = false;
+        meter.frozenKw = null;
+        meter.overloadTicksRemaining = 0;
+        meter.forcedOverload = false;
+        meter.currentKw = 0;
+        meter.prevState = 'OFF';
+        pushLog('OFF', meter.id, `Medidor ${meter.id} DESLIGADO (0.0 kW sem carga ativa)`);
+      } else {
+        meter.currentKw = meter.baseKw;
+        meter.prevState = 'NORMAL';
+        pushLog('NORMAL', meter.id, `Medidor ${meter.id} LIGADO novamente`);
+      }
+      
+      renderAll();
+    }
+
+    function toggleMeterPane() {
+      const meter = getSelectedMeter();
+      if (!meter) return;
+      meter.isPane = !meter.isPane;
+      if (meter.isPane) {
+        meter.isOff = false;
+        meter.overloadTicksRemaining = 0;
+        meter.forcedOverload = false;
+        meter.frozenKw = meter.currentKw > 0 ? meter.currentKw : meter.baseKw;
+        meter.currentKw = meter.frozenKw;
+        meter.prevState = 'PANE';
+        pushLog('PANE', meter.id, `PANE ELÉTRICA em ${meter.id}: leitura travada em ${meter.frozenKw.toFixed(1)} kW`);
+      } else {
+        meter.frozenKw = null;
+        meter.prevState = 'NORMAL';
+        pushLog('NORMAL', meter.id, `Pane elétrica restaurada em ${meter.id}`);
+      }
+      
+      renderAll();
+    }
+
+    function startOverload(meter, origin) {
+      meter.isOff = false;
+      meter.isPane = false;
+      meter.frozenKw = null;
+      meter.forcedOverload = true;
+      meter.overloadTicksRemaining = 0;
+      const threshold = getThreshold(meter);
+      meter.currentKw = Number((threshold * 1.18).toFixed(1));
+      meter.history[meter.history.length - 1] = meter.currentKw;
+      meter.prevState = 'OVERLOAD';
+      pushLog('OVERLOAD', meter.id, `SOBRECARGA ${origin} em ${meter.id} (${meter.nome}): ${meter.currentKw.toFixed(1)} kW (limiar ${threshold} kW)`);
+    }
+
+    function stopOverload(meter) {
+      meter.forcedOverload = false;
+      meter.overloadTicksRemaining = 0;
+      meter.currentKw = meter.baseKw;
+      meter.prevState = 'NORMAL';
+      pushLog('NORMAL', meter.id, `Sobrecarga encerrada em ${meter.id}: carga normalizada`);
+    }
+
+    // Botão principal: liga/desliga a sobrecarga mantida no medidor selecionado
+    function triggerOverloadOnSelected() {
+      const meter = getSelectedMeter();
+      if (!meter) return;
+      if (meter.forcedOverload) stopOverload(meter);
+      else startOverload(meter, 'disparada');
+      renderAll();
+    }
+
+    // Sobrecarga simultânea em 3 medidores sorteados (ligados e fora de alerta)
+    function triggerMultiOverload() {
+      const candidates = state.meters.filter((m) => !m.isOff && !m.isPane && !m.forcedOverload);
+      const picked = [];
+      while (picked.length < 3 && candidates.length) {
+        picked.push(candidates.splice(Math.floor(Math.random() * candidates.length), 1)[0]);
+      }
+      if (!picked.length) return;
+      picked.forEach((m) => startOverload(m, 'múltipla'));
+      pushLog('OVERLOAD', 'SISTEMA', `Sobrecarga simultânea em ${picked.length} medidores: ${picked.map((m) => m.id).join(', ')}`);
+      state.selectedMeterId = picked[0].id;
+      populateDropdown();
+      renderAll();
+    }
+
+    function resetAllToNormal() {
+      state.meters.forEach((m) => {
+        m.isOff = false;
+        m.isPane = false;
+        m.frozenKw = null;
+        m.overloadTicksRemaining = 0;
+        m.forcedOverload = false;
+        const safeVal = Math.min(m.baseKw, Number((getThreshold(m) * 0.7).toFixed(1)));
+        m.currentKw = Math.max(1, safeVal);
+        m.history = Array.from({ length: HISTORY_LENGTH }, () => Number((m.currentKw + (Math.random() - 0.5) * 3).toFixed(1)));
+        m.prevState = 'NORMAL';
+      });
+      state.routineProfile = 'normal';
+      els.routineProfileSelect.value = 'normal';
+      pushLog('NORMAL', 'SISTEMA', 'Todos os 27 medidores restaurados para rotina normal');
+      renderAll();
+    }
+
+    // =========================================================================
+    // AJUSTE DE CORES DOS INDICADORES / ARCOS (edite os códigos HEX abaixo)
+    // =========================================================================
+    const THEME_COLORS = {
+      normal: '#10b981',    // Verde: rotina normal
+      routine: '#f59e0b',   // Âmbar/Laranja: pico de rotina
+      overload: '#ef4444',  // Vermelho: sobrecarga
+      pane: '#a855f7',      // Roxo: pane elétrica / travado
+      off: '#64748b',       // Cinza: medidor desligado
+      ratio: '#0284c7'      // Azul: percentual vs. limiar
+    };
+
+    function updateSemiGauge(arcEl, needleEl, ratioClamped01, colorHex) {
+      const clamped = Math.max(0, Math.min(1, ratioClamped01));
+      const cx = 110;
+      const cy = 115;
+      const r = 90;
+      // Ângulo de 180° (esquerda: x=20, y=115) até 0° (direita: x=200, y=115)
+      const angleRad = Math.PI * (1 - clamped);
+      const x = cx + r * Math.cos(angleRad);
+      const y = cy - r * Math.sin(angleRad);
+      const needleDeg = -90 + clamped * 180;
+
+      if (clamped <= 0.005) {
+        arcEl.setAttribute('d', `M 20 115 A ${r} ${r} 0 0 1 20 115`);
+      } else {
+        // Como o arco vai de 180° até no máximo 0° (180° de abertura total), large-arc-flag é sempre 0
+        arcEl.setAttribute('d', `M 20 115 A ${r} ${r} 0 0 1 ${x.toFixed(2)} ${y.toFixed(2)}`);
+      }
+      arcEl.setAttribute('stroke', colorHex);
+      needleEl.setAttribute('transform', `translate(${cx}, ${cy}) rotate(${needleDeg.toFixed(1)})`);
+    }
+
+    function populateDropdown() {
+      els.meterDropdown.innerHTML = state.meters
+        .map((m, i) => `<option value="${m.id}" ${m.id === state.selectedMeterId ? 'selected' : ''}>${i + 1}. ${m.id} — ${m.nome}</option>`)
+        .join('');
+    }
+
+    function renderMeterSelectors() {
+      const q = state.searchQuery.trim().toLowerCase();
+      const filtered = state.meters.filter((m) => !q || m.id.toLowerCase().includes(q) || m.nome.toLowerCase().includes(q));
+
+      if (filtered.length === 0) {
+        els.meterSelectorGrid.innerHTML = `<div class="col-span-full text-xs text-slate-400 bg-cluster-card/70 border border-cluster-border rounded-xl p-3">Nenhum medidor encontrado para "${state.searchQuery}".</div>`;
+        return;
+      }
+
+      els.meterSelectorGrid.innerHTML = filtered
+        .map((m) => {
+          const isSelected = m.id === state.selectedMeterId;
+          const st = getMeterStatus(m);
+          let dotColor = 'bg-emerald-400';
+          let valColor = 'text-emerald-300';
+          if (st === 'OVERLOAD') { dotColor = 'bg-red-500 animate-ping'; valColor = 'text-red-400'; }
+          else if (st === 'PANE') { dotColor = 'bg-purple-400 animate-ping'; valColor = 'text-purple-300'; }
+          else if (st === 'OFF') { dotColor = 'bg-slate-400'; valColor = 'text-slate-400'; }
+          else if (st === 'ROUTINE_PEAK') { dotColor = 'bg-amber-400'; valColor = 'text-amber-300'; }
+
+          return `
+            <button
+              type="button"
+              data-meter-id="${m.id}"
+              class="meter-select-btn text-left p-2.5 rounded-xl border transition cursor-pointer ${
+                isSelected
+                  ? 'bg-sky-500/15 border-sky-400 ring-1 ring-sky-400/50'
+                  : 'bg-cluster-card/80 border-cluster-border hover:border-slate-500'
+              }"
+            >
+              <div class="flex items-center justify-between gap-2">
+                <span class="font-mono text-[11px] font-bold text-sky-300">Cód. ${m.id}</span>
+                <span class="w-2 h-2 rounded-full ${dotColor}"></span>
+              </div>
+              <div class="text-[11px] font-semibold text-white truncate mt-0.5">${m.nome}</div>
+              <div class="font-mono text-xs font-bold mt-1 ${valColor}">${m.currentKw.toFixed(1)} kW</div>
+            </button>
+          `;
+        })
+        .join('');
+
+      document.querySelectorAll('.meter-select-btn').forEach((node) => {
+        node.addEventListener('click', () => {
+          const id = node.getAttribute('data-meter-id');
+          if (id) {
+            state.selectedMeterId = id;
+            populateDropdown();
+            renderAll();
+          }
+        });
+      });
+    }
+
+    function renderCluster() {
+      const meter = getSelectedMeter();
+      const threshold = getThreshold(meter);
+      const scaleMax = getScaleMax(meter);
+      const status = getMeterStatus(meter);
+      const loadRatio = meter.currentKw / (threshold || 1);
+
+      els.clusterMeterCode.textContent = `Código: ${meter.id}`;
+      els.clusterMeterName.textContent = `Edifício: ${meter.nome}`;
+      els.clusterMeterSubtitle.textContent = `Medidor ${meter.id} • Campus Centro Politécnico (UFPR)`;
+      els.gaugeScaleInfo.textContent = `Referência: ${meter.baseKw} kW • Limiar: ${threshold} kW • Escala: ${Math.round(scaleMax)} kW`;
+      els.triggerOverloadText.textContent = meter.forcedOverload ? 'Encerrar Sobrecarga' : 'Simular Sobrecarga';
+
+      els.toggleOffBtn.textContent = meter.isOff ? 'Ligar Medidor' : 'Medidor Desligado';
+      els.togglePaneBtn.textContent = meter.isPane ? 'Restaurar Pane' : 'Pane Elétrica';
+
+      const estCurrentA = ((meter.currentKw * 1000) / (Math.sqrt(3) * 380 * 0.95)).toFixed(0);
+      const powerFactor = status === 'OFF' ? '0.00' : status === 'OVERLOAD' ? '0.88' : status === 'PANE' ? 'N/A' : '0.96';
+      els.liveCurrentVoltageDisplay.textContent = `Corrente Est.: ${estCurrentA} A • FP: ${powerFactor}`;
+      els.liveLoadRatioDisplay.textContent = status === 'OFF' ? '0% (OFF)' : status === 'PANE' ? `${Math.round(loadRatio * 100)}% (TRAVADO)` : `${Math.round(loadRatio * 100)}%`;
+
+      // Reset cluster styles
+      els.clusterFrame.classList.remove('cluster-overload-frame', 'cluster-pane-frame', 'border-red-500', 'border-purple-500', 'border-amber-500/60', 'border-slate-500/60', 'border-cluster-border');
+
+      els.lampOverload.className = 'rounded-2xl border border-slate-700/80 bg-slate-900/80 p-3.5 flex items-center justify-between transition-all';
+      els.lampOverloadIconBox.className = 'w-11 h-11 rounded-xl bg-slate-800 border border-slate-700 flex items-center justify-center text-slate-500';
+      els.lampOverloadState.className = 'font-mono text-[11px] font-bold px-2 py-1 rounded bg-slate-800 text-slate-400';
+      els.lampOverloadState.textContent = 'OFF';
+
+      // Reset separated state cards
+      els.lampOffStateCard.className = 'rounded-xl border border-slate-700/80 bg-slate-900/80 px-3.5 py-2.5 flex items-center justify-between transition-all';
+      els.lampOffIconBox.className = 'w-9 h-9 rounded-lg bg-slate-800 border border-slate-700 flex items-center justify-center text-slate-500';
+      els.lampOffBadge.className = 'font-mono text-[10px] font-bold px-2 py-0.5 rounded bg-slate-800 text-slate-400';
+      els.lampOffBadge.textContent = 'LIGADO';
+
+      els.lampPaneStateCard.className = 'rounded-xl border border-slate-700/80 bg-slate-900/80 px-3.5 py-2.5 flex items-center justify-between transition-all';
+      els.lampPaneIconBox.className = 'w-9 h-9 rounded-lg bg-slate-800 border border-slate-700 flex items-center justify-center text-slate-500';
+      els.lampPaneBadge.className = 'font-mono text-[10px] font-bold px-2 py-0.5 rounded bg-slate-800 text-slate-400';
+      els.lampPaneBadge.textContent = 'OK';
+      els.lampPaneDesc.textContent = 'Leitura congelada na tela';
+
+      els.lampNominal.className = 'rounded-xl border border-slate-700/80 bg-slate-900/70 px-3.5 py-2.5 flex items-center justify-between transition-all';
+      els.lampNominalIconBox.className = 'w-9 h-9 rounded-lg bg-slate-800 border border-slate-700 flex items-center justify-center text-slate-500';
+      els.lampNominalState.className = 'font-mono text-[10px] font-bold px-2 py-0.5 rounded bg-slate-800 text-slate-400';
+      els.lampNominalState.textContent = 'IDLE';
+      els.lampNominalTitle.textContent = 'ROTINA / PICO';
+      els.lampNominalDesc.textContent = 'Estado operacional do medidor';
+
+      if (meter.isOff) {
+        els.lampOffStateCard.className = 'rounded-xl border border-slate-400 bg-slate-800/90 px-3.5 py-2.5 flex items-center justify-between';
+        els.lampOffIconBox.className = 'w-9 h-9 rounded-lg bg-slate-600/50 border border-slate-400 flex items-center justify-center text-white';
+        els.lampOffBadge.className = 'font-mono text-[10px] font-extrabold px-2 py-0.5 rounded bg-slate-300 text-slate-950';
+        els.lampOffBadge.textContent = 'DESLIGADO';
+      }
+
+      if (meter.isPane) {
+        els.lampPaneStateCard.className = 'rounded-xl border border-purple-400 bg-purple-950/50 px-3.5 py-2.5 flex items-center justify-between lamp-pane-flash';
+        els.lampPaneIconBox.className = 'w-9 h-9 rounded-lg bg-purple-500/30 border border-purple-300 flex items-center justify-center text-purple-200';
+        els.lampPaneDesc.textContent = `Travado em ${meter.currentKw.toFixed(1)} kW`;
+        els.lampPaneBadge.className = 'font-mono text-[10px] font-extrabold px-2 py-0.5 rounded bg-purple-500 text-white';
+        els.lampPaneBadge.textContent = 'TRAVOU';
+      }
+
+      if (status === 'OVERLOAD') {
+        els.clusterFrame.classList.add('cluster-overload-frame', 'border-red-500');
+        els.masterStatusBanner.className = 'px-4 py-2.5 rounded-2xl border flex items-center gap-3 self-start md:self-auto bg-red-500/20 border-red-500 text-red-200 lamp-overload-flash';
+        els.masterStatusDot.className = 'w-3 h-3 rounded-full bg-red-500';
+        els.masterStatusLabel.textContent = 'ALERTA DE SOBRECARGA';
+        els.masterStatusSub.textContent = `Consumo excedeu o limiar de ${threshold} kW (${(meter.currentKw - threshold).toFixed(1)} kW acima)${meter.forcedOverload ? ' • sobrecarga mantida' : ''}`;
+        els.livePowerDisplay.className = 'font-mono text-3xl sm:text-4xl font-extrabold text-red-400';
+
+        els.lampOverload.className = 'rounded-xl border border-red-500 bg-red-950/50 px-3.5 py-2.5 flex items-center justify-between lamp-overload-flash';
+        els.lampOverloadIconBox.className = 'w-9 h-9 rounded-lg bg-red-500/25 border border-red-400 flex items-center justify-center text-red-300';
+        els.lampOverloadState.className = 'font-mono text-[10px] font-extrabold px-2 py-0.5 rounded bg-red-500 text-white';
+        els.lampOverloadState.textContent = 'ALERTA';
+
+        updateSemiGauge(els.powerGaugeArc, els.powerGaugeNeedle, meter.currentKw / scaleMax, '#ef4444');
+        updateSemiGauge(els.loadRatioArc, els.loadRatioNeedle, loadRatio / 1.4, '#ef4444');
+      } else if (status === 'PANE') {
+        els.clusterFrame.classList.add('cluster-pane-frame', 'border-purple-500');
+        els.masterStatusBanner.className = 'px-4 py-2.5 rounded-2xl border flex items-center gap-3 self-start md:self-auto bg-purple-500/20 border-purple-400 text-purple-200 lamp-pane-flash';
+        els.masterStatusDot.className = 'w-3 h-3 rounded-full bg-purple-400';
+        els.masterStatusLabel.textContent = 'PANE ELÉTRICA';
+        els.masterStatusSub.textContent = `Leitura congelada em ${meter.currentKw.toFixed(1)} kW (sem atualização da rede)`;
+        els.livePowerDisplay.className = 'font-mono text-3xl sm:text-4xl font-extrabold text-purple-300';
+
+        updateSemiGauge(els.powerGaugeArc, els.powerGaugeNeedle, meter.currentKw / scaleMax, '#c084fc');
+        updateSemiGauge(els.loadRatioArc, els.loadRatioNeedle, loadRatio / 1.4, '#c084fc');
+      } else if (status === 'OFF') {
+        els.clusterFrame.classList.add('border-slate-500/60');
+        els.masterStatusBanner.className = 'px-4 py-2.5 rounded-2xl border flex items-center gap-3 self-start md:self-auto bg-slate-700/40 border-slate-500 text-slate-200';
+        els.masterStatusDot.className = 'w-3 h-3 rounded-full bg-slate-400';
+        els.masterStatusLabel.textContent = 'MEDIDOR DESLIGADO';
+        els.masterStatusSub.textContent = 'Sem carga ativa (0.0 kW) • Chave/circuito desligado';
+        els.livePowerDisplay.className = 'font-mono text-3xl sm:text-4xl font-extrabold text-slate-400';
+
+        updateSemiGauge(els.powerGaugeArc, els.powerGaugeNeedle, 0, '#94a3b8');
+        updateSemiGauge(els.loadRatioArc, els.loadRatioNeedle, 0, '#94a3b8');
+      } else if (status === 'ROUTINE_PEAK') {
+        els.clusterFrame.classList.add('border-amber-500/60');
+        els.masterStatusBanner.className = 'px-4 py-2.5 rounded-2xl border flex items-center gap-3 self-start md:self-auto bg-amber-500/15 border-amber-500/40 text-amber-200';
+        els.masterStatusDot.className = 'w-3 h-3 rounded-full bg-amber-400';
+        els.masterStatusLabel.textContent = 'PICO DE ROTINA';
+        els.masterStatusSub.textContent = `Próximo ao limiar de ${threshold} kW (faixa de atenção)`;
+        els.livePowerDisplay.className = 'font-mono text-3xl sm:text-4xl font-extrabold text-amber-300';
+
+        els.lampNominal.className = 'rounded-xl border border-amber-500/60 bg-amber-950/35 px-3.5 py-2.5 flex items-center justify-between lamp-routine-flash';
+        els.lampNominalIconBox.className = 'w-9 h-9 rounded-lg bg-amber-500/20 border border-amber-400/50 flex items-center justify-center text-amber-300';
+        els.lampNominalTitle.textContent = 'PICO DE ROTINA';
+        els.lampNominalDesc.textContent = 'Faixa de atenção (90%–100% do limiar)';
+        els.lampNominalState.className = 'font-mono text-[10px] font-bold px-2 py-0.5 rounded bg-amber-500/25 text-amber-200';
+        els.lampNominalState.textContent = 'PICO';
+
+        updateSemiGauge(els.powerGaugeArc, els.powerGaugeNeedle, meter.currentKw / scaleMax, '#f59e0b');
+        updateSemiGauge(els.loadRatioArc, els.loadRatioNeedle, loadRatio / 1.4, '#f59e0b');
+      } else {
+        els.clusterFrame.classList.add('border-cluster-border');
+        els.masterStatusBanner.className = 'px-4 py-2.5 rounded-2xl border flex items-center gap-3 self-start md:self-auto bg-emerald-500/10 border-emerald-500/30 text-emerald-300';
+        els.masterStatusDot.className = 'w-3 h-3 rounded-full bg-emerald-400';
+        els.masterStatusLabel.textContent = 'ROTINA NORMAL';
+        els.masterStatusSub.textContent = `Operação estável abaixo do limiar de ${threshold} kW`;
+        els.livePowerDisplay.className = 'font-mono text-3xl sm:text-4xl font-extrabold text-emerald-400';
+
+        els.lampNominal.className = 'rounded-xl border border-emerald-500/40 bg-emerald-500/10 px-3.5 py-2.5 flex items-center justify-between';
+        els.lampNominalIconBox.className = 'w-9 h-9 rounded-lg bg-emerald-500/20 border border-emerald-400/40 flex items-center justify-center text-emerald-400';
+        els.lampNominalTitle.textContent = 'ROTINA NORMAL';
+        els.lampNominalDesc.textContent = 'Tensão e frequência estáveis';
+        els.lampNominalState.className = 'font-mono text-[10px] font-bold px-2 py-0.5 rounded bg-emerald-500/20 text-emerald-300';
+        els.lampNominalState.textContent = 'OK';
+
+        updateSemiGauge(els.powerGaugeArc, els.powerGaugeNeedle, meter.currentKw / scaleMax, '#10b981');
+        updateSemiGauge(els.loadRatioArc, els.loadRatioNeedle, loadRatio / 1.4, '#38bdf8');
+      }
+
+      els.livePowerDisplay.innerHTML = `${meter.currentKw.toFixed(1)} <span class="text-base font-semibold text-slate-400">kW</span>`;
+    }
+
+    function renderTelemetryChart() {
+      const canvas = els.telemetryCanvas;
+      const rect = canvas.getBoundingClientRect();
+      if (rect.width === 0 || rect.height === 0) return;
+
+      const dpr = window.devicePixelRatio || 1;
+      canvas.width = Math.round(rect.width * dpr);
+      canvas.height = Math.round(rect.height * dpr);
+
+      const ctx = canvas.getContext('2d');
+      ctx.save();
+      ctx.scale(dpr, dpr);
+
+      const w = rect.width, h = rect.height;
+      const padLeft = 46, padRight = 16, padTop = 18, padBottom = 28;
+      const plotW = Math.max(10, w - padLeft - padRight);
+      const plotH = Math.max(10, h - padTop - padBottom);
+
+      const meter = getSelectedMeter();
+      const status = getMeterStatus(meter);
+      const meterThreshold = getThreshold(meter);
+      const maxVal = getScaleMax(meter);
+      const minVal = 0;
+
+      els.chartSubtitleText.textContent =
+        status === 'PANE'
+          ? 'Pane elétrica ativa: leitura travada no último valor registrado (linha roxa)'
+          : status === 'OFF'
+          ? 'Medidor desligado: carga em 0.0 kW (linha cinza)'
+          : 'Linha tracejada vermelha indica o limiar de sobrecarga configurado';
+
+      const yForValue = (val) => {
+        const clamped = Math.max(minVal, Math.min(maxVal, val));
+        return padTop + plotH - ((clamped - minVal) / (maxVal - minVal)) * plotH;
+      };
+
+      ctx.font = '11px "JetBrains Mono", monospace';
+      ctx.textAlign = 'right';
+      ctx.textBaseline = 'middle';
+      for (let i = 0; i <= 4; i++) {
+        const val = (maxVal / 4) * i;
+        const y = yForValue(val);
+        ctx.strokeStyle = 'rgba(51, 65, 85, 0.45)';
+        ctx.lineWidth = 1;
+        ctx.beginPath();
+        ctx.moveTo(padLeft, y);
+        ctx.lineTo(padLeft + plotW, y);
+        ctx.stroke();
+
+        ctx.fillStyle = '#94a3b8';
+        ctx.fillText(`${Math.round(val)}`, padLeft - 8, y);
+      }
+
+      const threshY = yForValue(meterThreshold);
+      ctx.save();
+      ctx.setLineDash([6, 5]);
+      ctx.strokeStyle = 'rgba(239, 68, 68, 0.85)';
+      ctx.lineWidth = 1.6;
+      ctx.beginPath();
+      ctx.moveTo(padLeft, threshY);
+      ctx.lineTo(padLeft + plotW, threshY);
+      ctx.stroke();
+      ctx.restore();
+
+      const pts = meter.history;
+      if (pts.length > 1) {
+        const stepX = plotW / (HISTORY_LENGTH - 1);
+        const strokeColor =
+          status === 'OVERLOAD' ? '#f87171' :
+          status === 'PANE' ? '#c084fc' :
+          status === 'OFF' ? '#94a3b8' : '#38bdf8';
+
+        ctx.beginPath();
+        pts.forEach((val, idx) => {
+          const x = padLeft + idx * stepX;
+          const y = yForValue(val);
+          if (idx === 0) ctx.moveTo(x, y);
+          else ctx.lineTo(x, y);
+        });
+        ctx.strokeStyle = strokeColor;
+        ctx.lineWidth = 2.5;
+        ctx.stroke();
+
+        pts.forEach((val, idx) => {
+          if (val >= meterThreshold && status !== 'OFF' && status !== 'PANE') {
+            const x = padLeft + idx * stepX;
+            const y = yForValue(val);
+            ctx.beginPath();
+            ctx.arc(x, y, 3.8, 0, Math.PI * 2);
+            ctx.fillStyle = '#ef4444';
+            ctx.fill();
+          }
+        });
+      }
+
+      ctx.fillStyle = '#64748b';
+      ctx.textAlign = 'left';
+      ctx.fillText(`-${HISTORY_LENGTH} amostras (${meter.id})`, padLeft, h - 10);
+      ctx.textAlign = 'right';
+      ctx.fillText('Agora (tempo real)', padLeft + plotW, h - 10);
+
+      ctx.restore();
+    }
+
+    function renderEventLog() {
+      if (state.logs.length === 0) {
+        els.eventLogList.innerHTML = `<div class="text-xs text-slate-400 bg-cluster-card/60 border border-cluster-border/60 rounded-xl p-3">Sem eventos registrados.</div>`;
+        return;
+      }
+
+      els.eventLogList.innerHTML = state.logs
+        .map((entry) => {
+          let rowStyle = 'border-slate-700/70 bg-cluster-card/70 text-slate-200';
+          let tagStyle = 'bg-emerald-500/20 text-emerald-300';
+          let tagLabel = 'ROTINA';
+
+          if (entry.type === 'OVERLOAD') {
+            rowStyle = 'border-red-500/50 bg-red-950/30 text-red-100';
+            tagStyle = 'bg-red-500/25 text-red-300';
+            tagLabel = 'SOBRECARGA';
+          } else if (entry.type === 'PANE') {
+            rowStyle = 'border-purple-500/50 bg-purple-950/30 text-purple-100';
+            tagStyle = 'bg-purple-500/25 text-purple-200';
+            tagLabel = 'PANE';
+          } else if (entry.type === 'OFF') {
+            rowStyle = 'border-slate-600/60 bg-slate-900/60 text-slate-300';
+            tagStyle = 'bg-slate-600/40 text-slate-200';
+            tagLabel = 'DESLIGADO';
+          } else if (entry.type === 'ROUTINE_PEAK') {
+            rowStyle = 'border-amber-500/40 bg-amber-950/20 text-amber-100';
+            tagStyle = 'bg-amber-500/25 text-amber-300';
+            tagLabel = 'PICO';
+          }
+
+          return `
+            <div class="rounded-xl border p-2.5 text-xs ${rowStyle}">
+              <div class="flex items-center justify-between gap-2 mb-1">
+                <span class="font-mono text-[10px] font-bold px-1.5 py-0.5 rounded ${tagStyle}">${tagLabel}</span>
+                <span class="font-mono text-[11px] text-slate-400">${entry.time}</span>
+              </div>
+              <div class="leading-snug">${entry.message}</div>
+            </div>
+          `;
+        })
+        .join('');
+    }
+    function setRunning() {
+      state.isRunning = true;
+      if (state.timerId) clearInterval(state.timerId);
+      state.timerId = setInterval(stepSimulation, state.tickIntervalMs);
+    }
+
+
+    function renderComparisonChart() {
+      const canvas = els.comparisonCanvas;
+      if (!canvas) return;
+      const rect = canvas.getBoundingClientRect();
+      if (rect.width === 0 || rect.height === 0) return;
+
+      const threshold = state.overloadThresholdKw;
+      const isRelative = state.thresholdMode === 'relative';
+      const totalKw = state.meters.reduce((acc, m) => acc + m.currentKw, 0);
+      const activeCount = state.meters.filter((m) => !m.isOff).length;
+      const overloadCount = state.meters.filter((m) => getMeterStatus(m) === 'OVERLOAD').length;
+      const paneCount = state.meters.filter((m) => m.isPane).length;
+      const offCount = state.meters.filter((m) => m.isOff).length;
+
+      const sortedAll = [...state.meters].sort((a, b) => b.currentKw - a.currentKw);
+      const topMeter = sortedAll[0];
+
+      els.totalCampusKwBadge.textContent = `Soma Instantânea: ${totalKw.toFixed(1)} kW`;
+      els.activeMetersCountBadge.textContent = `${activeCount}/27 Ligados`;
+      els.summaryTotalKw.textContent = `${totalKw.toFixed(1)} kW`;
+      els.summaryTopMeter.textContent = topMeter ? `Código ${topMeter.id} • ${topMeter.currentKw.toFixed(1)} kW` : '—';
+      if (els.summaryTopMeterName) {
+        els.summaryTopMeterName.textContent = topMeter ? `Edifício: ${topMeter.nome}` : '—';
+      }
+      els.summaryAlertsCount.textContent = `${overloadCount} Sobrec. • ${paneCount} Pane • ${offCount} Off`;
+
+      const mode = els.compareModeSelect ? els.compareModeSelect.value : 'top12';
+      const items = mode === 'all27' ? sortedAll : sortedAll.slice(0, 12);
+
+      const dpr = window.devicePixelRatio || 1;
+      canvas.width = Math.round(rect.width * dpr);
+      canvas.height = Math.round(rect.height * dpr);
+
+      const ctx = canvas.getContext('2d');
+      ctx.save();
+      ctx.scale(dpr, dpr);
+
+      const w = rect.width;
+      const h = rect.height;
+      const padLeft = 46;
+      const padRight = 14;
+      const padTop = 18;
+      const padBottom = 46;
+      const plotW = Math.max(20, w - padLeft - padRight);
+      const plotH = Math.max(20, h - padTop - padBottom);
+
+      const maxBarVal = Math.max(
+        isRelative ? 0 : threshold * 1.15,
+        ...items.map((m) => Math.max(m.currentKw, isRelative ? getThreshold(m) * 1.05 : 0)),
+        50
+      );
+
+      ctx.font = '10px "JetBrains Mono", monospace';
+      ctx.textAlign = 'right';
+      ctx.textBaseline = 'middle';
+      for (let i = 0; i <= 4; i++) {
+        const val = (maxBarVal / 4) * i;
+        const y = padTop + plotH - (val / maxBarVal) * plotH;
+        ctx.strokeStyle = 'rgba(51, 65, 85, 0.45)';
+        ctx.lineWidth = 1;
+        ctx.beginPath();
+        ctx.moveTo(padLeft, y);
+        ctx.lineTo(padLeft + plotW, y);
+        ctx.stroke();
+
+        ctx.fillStyle = '#94a3b8';
+        ctx.fillText(`${Math.round(val)}`, padLeft - 7, y);
+      }
+
+      if (!isRelative) {
+        const threshY = padTop + plotH - (Math.min(threshold, maxBarVal) / maxBarVal) * plotH;
+        ctx.save();
+        ctx.setLineDash([5, 4]);
+        ctx.strokeStyle = 'rgba(239, 68, 68, 0.8)';
+        ctx.lineWidth = 1.4;
+        ctx.beginPath();
+        ctx.moveTo(padLeft, threshY);
+        ctx.lineTo(padLeft + plotW, threshY);
+        ctx.stroke();
+        ctx.restore();
+      }
+
+      const slotW = plotW / Math.max(1, items.length);
+      const barW = Math.max(6, Math.min(28, slotW * 0.62));
+
+      items.forEach((m, idx) => {
+        const st = getMeterStatus(m);
+        const barH = Math.max(2, (m.currentKw / maxBarVal) * plotH);
+        const x = padLeft + idx * slotW + (slotW - barW) / 2;
+        const y = padTop + plotH - barH;
+
+        let color = '#10b981';
+        if (st === 'OVERLOAD') color = '#ef4444';
+        else if (st === 'PANE') color = '#c084fc';
+        else if (st === 'OFF') color = '#64748b';
+        else if (st === 'ROUTINE_PEAK') color = '#f59e0b';
+
+        ctx.fillStyle = color;
+        ctx.beginPath();
+        ctx.roundRect(x, y, barW, barH, [4, 4, 0, 0]);
+        ctx.fill();
+
+        // limiar próprio de cada medidor (modo relativo): marca vermelha sobre a barra
+        if (isRelative) {
+          const ty = padTop + plotH - (getThreshold(m) / maxBarVal) * plotH;
+          ctx.save();
+          ctx.strokeStyle = 'rgba(239, 68, 68, 0.9)';
+          ctx.lineWidth = 2;
+          ctx.beginPath();
+          ctx.moveTo(x - 3, ty);
+          ctx.lineTo(x + barW + 3, ty);
+          ctx.stroke();
+          ctx.restore();
+        }
+
+        if (m.id === state.selectedMeterId) {
+          ctx.strokeStyle = '#38bdf8';
+          ctx.lineWidth = 1.5;
+          ctx.strokeRect(x - 1.5, y - 1.5, barW + 3, barH + 3);
+        }
+
+        ctx.save();
+        ctx.fillStyle = m.id === state.selectedMeterId ? '#7dd3fc' : '#94a3b8';
+        ctx.font = '9px "JetBrains Mono", monospace';
+        ctx.textAlign = 'center';
+        ctx.textBaseline = 'top';
+        const codeLabel = mode === 'all27' ? m.id.replace('CCJA', '') : m.id;
+        ctx.fillText(codeLabel, x + barW / 2, padTop + plotH + 6);
+        ctx.restore();
+      });
+
+      ctx.fillStyle = '#64748b';
+      ctx.font = '10px "Inter", sans-serif';
+      ctx.textAlign = 'center';
+      ctx.fillText(
+        mode === 'all27'
+          ? 'Código do medidor (sufixo numérico após CCJA)'
+          : 'Código do medidor (CCJA)',
+        padLeft + plotW / 2,
+        h - 10
+      );
+
+      ctx.restore();
+    }
+
+    function renderActiveAlerts() {
+      const order = { OVERLOAD: 0, PANE: 1, OFF: 2 };
+      const alerts = state.meters
+        .map((m) => ({ m, st: getMeterStatus(m) }))
+        .filter((a) => a.st in order)
+        .sort((a, b) => order[a.st] - order[b.st]);
+
+      const nOver = alerts.filter((a) => a.st === 'OVERLOAD').length;
+      if (!alerts.length) {
+        els.activeAlertsCountBadge.className = 'text-xs font-mono font-bold px-2.5 py-1 rounded-lg bg-emerald-500/15 text-emerald-300 border border-emerald-500/30 self-start sm:self-auto';
+        els.activeAlertsCountBadge.textContent = 'Nenhum alerta';
+        els.activeAlertsList.innerHTML = '<div class="text-xs text-slate-400">Todos os medidores operando em rotina.</div>';
+        return;
+      }
+      els.activeAlertsCountBadge.className = nOver
+        ? 'text-xs font-mono font-bold px-2.5 py-1 rounded-lg bg-red-500/20 text-red-300 border border-red-500/50 self-start sm:self-auto'
+        : 'text-xs font-mono font-bold px-2.5 py-1 rounded-lg bg-purple-500/20 text-purple-200 border border-purple-400/50 self-start sm:self-auto';
+      els.activeAlertsCountBadge.textContent = `${alerts.length} em alerta (${nOver} sobrecarga)`;
+
+      const styles = {
+        OVERLOAD: ['border-red-500/70 bg-red-950/40 text-red-100', 'bg-red-500 text-white', 'SOBRECARGA'],
+        PANE: ['border-purple-400/70 bg-purple-950/40 text-purple-100', 'bg-purple-500 text-white', 'PANE'],
+        OFF: ['border-slate-500/70 bg-slate-800/60 text-slate-200', 'bg-slate-300 text-slate-950', 'DESLIGADO']
+      };
+      els.activeAlertsList.innerHTML = alerts.map(({ m, st }) => {
+        const [box, tag, label] = styles[st];
+        const sel = m.id === state.selectedMeterId ? ' ring-1 ring-sky-400' : '';
+        return `
+          <button type="button" data-alert-id="${m.id}" class="alert-chip text-left rounded-xl border px-3 py-2 text-xs transition cursor-pointer hover:brightness-125 ${box}${sel}">
+            <div class="flex items-center gap-2">
+              <span class="font-mono text-[10px] font-extrabold px-1.5 py-0.5 rounded ${tag}">${label}</span>
+              <span class="font-mono font-bold">${m.id}</span>
+              <span class="font-mono opacity-80">${m.currentKw.toFixed(1)} kW</span>
+            </div>
+            <div class="text-[11px] opacity-80 mt-0.5 max-w-[16rem] truncate">${m.nome}</div>
+          </button>`;
+      }).join('');
+
+      document.querySelectorAll('.alert-chip').forEach((node) => {
+        node.addEventListener('click', () => {
+          state.selectedMeterId = node.getAttribute('data-alert-id');
+          populateDropdown();
+          renderAll();
+        });
+      });
+    }
+
+    function renderAll() {
+      renderActiveAlerts();
+      renderMeterSelectors();
+      renderCluster();
+      renderTelemetryChart();
+      renderComparisonChart();
+    }
+
+    els.meterDropdown.addEventListener('change', (e) => {
+      state.selectedMeterId = e.target.value;
+      renderAll();
+    });
+
+    els.meterSearchInput.addEventListener('input', (e) => {
+      state.searchQuery = e.target.value;
+      renderMeterSelectors();
+    });
+
+    els.thresholdSlider.addEventListener('input', (e) => {
+      state.overloadThresholdKw = Number(e.target.value);
+      els.thresholdValueLabel.textContent = `${state.overloadThresholdKw} kW`;
+      renderAll();
+    });
+
+    els.thresholdModeSelect.addEventListener('change', (e) => {
+      state.thresholdMode = e.target.value;
+      els.relativeThresholdBox.classList.toggle('hidden', state.thresholdMode !== 'relative');
+      els.fixedThresholdBox.classList.toggle('hidden', state.thresholdMode !== 'fixed');
+      pushLog('ROUTINE_PEAK', 'LIMIAR', `Tipo de limiar alterado para: ${thresholdLabel()}`);
+      renderAll();
+    });
+
+    els.relativeSlider.addEventListener('input', (e) => {
+      state.relativePct = Number(e.target.value);
+      els.relativeValueLabel.textContent = `+${state.relativePct}%`;
+      renderAll();
+    });
+
+    els.multiOverloadBtn.addEventListener('click', triggerMultiOverload);
+
+    els.routineProfileSelect.addEventListener('change', (e) => {
+      state.routineProfile = e.target.value;
+      pushLog('ROUTINE_PEAK', 'PERFIL', `Variação alterada para: ${e.target.options[e.target.selectedIndex].text}`);
+    });
+
+    els.tickSpeedSelect.addEventListener('change', (e) => {
+      state.tickIntervalMs = Number(e.target.value);
+      if (state.isRunning) setRunning(true);
+    });
+
+    
+    els.toggleOffBtn.addEventListener('click', toggleMeterOff);
+    els.togglePaneBtn.addEventListener('click', toggleMeterPane);
+    els.triggerOverloadBtn.addEventListener('click', triggerOverloadOnSelected);
+    els.resetNormalBtn.addEventListener('click', resetAllToNormal);
+
+    els.clearLogBtn.addEventListener('click', () => {
+      state.logs = [];
+      renderEventLog();
+    });
+
+    window.addEventListener('resize', () => { renderTelemetryChart(); renderComparisonChart(); });
+    if (els.compareModeSelect) {
+      els.compareModeSelect.addEventListener('change', () => renderComparisonChart());
+    }
+
+    populateDropdown();
+    pushLog('NORMAL', 'SISTEMA', 'Simulador carregado com os 27 medidores do Centro Politécnico (UFPR)');
+    renderEventLog();
+    renderAll();
+    setRunning(true);
+  </script>
+</body>
+</html>
